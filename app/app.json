@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "Erasmusu",
+    "slug": "erasmusu",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "platforms": ["ios", "android"],
+    "ios": { "supportsTablet": true },
+    "android": { "package": "com.erasmusu.app" }
+  }
+}

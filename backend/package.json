@@ -1,0 +1,20 @@
+{
+  "name": "@erasmusu/backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx tsc -p tsconfig.json && node ./dist/index.js",
+    "build": "tsc -p tsconfig.json",
+    "start": "node ./dist/index.js",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "echo \"backend: sin tests propios en T1 (contrato en @erasmusu/domain)\""
+  },
+  "dependencies": {
+    "@erasmusu/domain": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "typescript": "~5.6.3"
+  }
+}

@@ -1,0 +1,3 @@
+# Criterio de listo para v1
+
+v1 se considera lista para gente real en **Roma** cuando hay: import de fuentes potables; “fuente más cercana” sin ads con botón “tengo sed” + caché offline; aporte con foto y revisión en dos pasos (explícito + tipo) con EXIF como señal; cuenta (favoritos simples, aportes, señales en 2 taps sin foto); estado operativo con frescura y caducidad; atributos en lista cerrada (accesible, caudal rápido, en sombra, asientos cerca, agua muy fría, apta para perros); reconocimiento ligero sin ranking; y botón “invita un caffè”. Barcelona, Madrid y Bilbao no son requisito de listo v1.
