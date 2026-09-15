@@ -1,7 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Button,
   FlatList,
+  Linking,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +12,7 @@ import {
 } from "react-native";
 import { Marker, Circle, PROVIDER_DEFAULT } from "react-native-maps";
 import ClusteredMapView from "react-native-map-clustering";
+import * as Location from "expo-location";
 import {
   HaversinePresenceGate,
   InMemoryFuenteCatalog,
@@ -19,12 +22,44 @@ import {
   type FuentePublica,
 } from "@erasmusu/domain";
 
+/** Centro de Roma: fallback si no hay permiso de ubicación. */
 const ROMA = { lat: 41.9028, lon: 12.4964 };
 const NOMBRE_FUENTE = "Fuente";
 
+/** URL de la app de mapas del sistema (ADR-0005: sin turn-by-turn in-app). */
+export function urlMapasSistema(lat: number, lon: number): string {
+  if (Platform.OS === "ios") {
+    return `http://maps.apple.com/?daddr=${lat},${lon}`;
+  }
+  if (Platform.OS === "android") {
+    return `geo:${lat},${lon}?q=${lat},${lon}(${encodeURIComponent(NOMBRE_FUENTE)})`;
+  }
+  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+}
+
+function textoEstado(estado: FuentePublica["estado"]): string {
+  switch (estado) {
+    case "en-servicio":
+      return "en servicio";
+    case "seca":
+      return "seca / sin caudal";
+    case "incidencia-temporal":
+      return "incidencia temporal";
+    default:
+      return "estado desconocido";
+  }
+}
+
+function textoFrescura(dias: number | null): string | null {
+  if (dias === null) return null;
+  if (dias === 0) return "confirmada hoy";
+  if (dias === 1) return "confirmada hace 1 día";
+  return `confirmada hace ${dias} días`;
+}
+
 /**
- * T2: mapa + lista de fuentes potables OSM Roma, sin cuenta.
- * Snapshot ODbL potable-only (Trevi ornamental filtrado al importar).
+ * T3a: modo sed en línea — GPS → masCercana usable → ficha (estado,
+ * frescura, reciente) → abrir en mapas del sistema. Sin cuenta ni ads.
  */
 export default function App() {
   const { height } = useWindowDimensions();
@@ -38,21 +73,52 @@ export default function App() {
     return cat;
   }, []);
 
-  const fuentes = useMemo(
-    () => catalog.cercanas({ ...ROMA, ciudadId: "roma", limite: 500 }),
-    [catalog],
+  const [origen, setOrigen] = useState(ROMA);
+  const [gpsEstado, setGpsEstado] = useState<"pendiente" | "ok" | "fallback">(
+    "pendiente",
   );
-
-  /** Solo el id: cambia el pinColor remonta Markers y “salta” la selección. */
-  const [seleccionId, setSeleccionId] = useState<string | undefined>(
-    () => fuentes[0]?.id,
-  );
+  const [seleccionId, setSeleccionId] = useState<string | undefined>();
   const [vista, setVista] = useState<"mapa" | "lista">("mapa");
-  const [sed, setSed] = useState<string | null>(null);
+  const [mensajeSed, setMensajeSed] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelado = false;
+    (async () => {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          if (!cancelado) setGpsEstado("fallback");
+          return;
+        }
+        const pos = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        if (cancelado) return;
+        setOrigen({
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude,
+        });
+        setGpsEstado("ok");
+      } catch {
+        if (!cancelado) setGpsEstado("fallback");
+      }
+    })();
+    return () => {
+      cancelado = true;
+    };
+  }, []);
+
+  const fuentes = useMemo(
+    () => catalog.cercanas({ ...origen, ciudadId: "roma", limite: 500 }),
+    [catalog, origen],
+  );
 
   const seleccion = useMemo(
-    () => fuentes.find((f) => f.id === seleccionId),
-    [fuentes, seleccionId],
+    () =>
+      seleccionId
+        ? catalog.detalle(seleccionId, origen)
+        : undefined,
+    [catalog, seleccionId, origen],
   );
 
   const seleccionar = (f: FuentePublica) => {
@@ -60,26 +126,36 @@ export default function App() {
   };
 
   const tengoSed = () => {
-    const f = catalog.masCercana({ ...ROMA, ciudadId: "roma" });
+    const f = catalog.masCercana({ ...origen, ciudadId: "roma" });
     if (!f) {
-      setSed("Sin fuentes potables en el catálogo.");
+      setMensajeSed("Sin fuente usable cerca (ocultas/secas excluidas).");
       return;
     }
     seleccionar(f);
-    setSed(
-      `${NOMBRE_FUENTE} más cercana a ${Math.round(f.distanciaM)} m`,
-    );
+    setMensajeSed(`${NOMBRE_FUENTE} usable a ${Math.round(f.distanciaM)} m`);
   };
+
+  const abrirEnMapas = () => {
+    if (!seleccion) return;
+    void Linking.openURL(urlMapasSistema(seleccion.lat, seleccion.lon));
+  };
+
+  const origenLabel =
+    gpsEstado === "ok"
+      ? "desde tu ubicación"
+      : gpsEstado === "fallback"
+        ? "desde centro de Roma (sin GPS)"
+        : "ubicando…";
 
   return (
     <View style={estilos.raiz}>
       <View style={estilos.cabecera}>
         <Text style={estilos.titulo}>Erasmusu · Roma</Text>
         <Text style={estilos.sub}>
-          {fuentes.length} fuentes potables · sin cuenta · ODbL OSM
+          {fuentes.length} fuentes potables · sin cuenta · {origenLabel}
         </Text>
         <Button title="Tengo sed" onPress={tengoSed} color="#0b6e4f" />
-        {sed ? <Text style={estilos.sed}>{sed}</Text> : null}
+        {mensajeSed ? <Text style={estilos.sed}>{mensajeSed}</Text> : null}
         <View style={estilos.tabs}>
           <Pressable
             onPress={() => setVista("mapa")}
@@ -98,11 +174,12 @@ export default function App() {
 
       {vista === "mapa" ? (
         <ClusteredMapView
+          key={`mapa-${origen.lat.toFixed(4)}-${origen.lon.toFixed(4)}`}
           style={{ height: height * 0.48, width: "100%" }}
           provider={PROVIDER_DEFAULT}
           initialRegion={{
-            latitude: ROMA.lat,
-            longitude: ROMA.lon,
+            latitude: origen.lat,
+            longitude: origen.lon,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}
@@ -113,6 +190,7 @@ export default function App() {
           minPoints={3}
           animationEnabled={false}
           spiralEnabled={false}
+          showsUserLocation={gpsEstado === "ok"}
         >
           {fuentes.map((f) => (
             <Marker
@@ -156,8 +234,7 @@ export default function App() {
             >
               <Text style={estilos.filaTitulo}>{NOMBRE_FUENTE}</Text>
               <Text style={estilos.filaMeta}>
-                {Math.round(item.distanciaM)} m · {item.lat.toFixed(5)},{" "}
-                {item.lon.toFixed(5)}
+                {Math.round(item.distanciaM)} m · {textoEstado(item.estado)}
               </Text>
             </Pressable>
           )}
@@ -169,12 +246,29 @@ export default function App() {
           <>
             <Text style={estilos.fichaTitulo}>{NOMBRE_FUENTE}</Text>
             <Text style={estilos.fichaCuerpo}>
-              {Math.round(seleccion.distanciaM)} m desde el centro · estado{" "}
-              {seleccion.estado}
+              {Math.round(seleccion.distanciaM)} m · {textoEstado(seleccion.estado)}
+              {" · "}
+              {textoFrescura(seleccion.confirmadaHaceDias) ??
+                "sin confirmación reciente"}
             </Text>
+            {seleccion.reciente ? (
+              <Text style={estilos.avisoReciente}>
+                Aviso de reciente: aún sin respaldo de la comunidad; se muestra
+                con menos confianza.
+              </Text>
+            ) : null}
+            <View style={estilos.fichaAcciones}>
+              <Button
+                title="Abrir en mapas"
+                onPress={abrirEnMapas}
+                color="#0b6e4f"
+              />
+            </View>
           </>
         ) : (
-          <Text style={estilos.fichaCuerpo}>Elige un pin o una fila.</Text>
+          <Text style={estilos.fichaCuerpo}>
+            Pulsa «Tengo sed» o elige un pin.
+          </Text>
         )}
       </View>
     </View>
@@ -219,4 +313,11 @@ const estilos = StyleSheet.create({
   },
   fichaTitulo: { fontSize: 12, fontWeight: "700", color: "#0b6e4f" },
   fichaCuerpo: { fontSize: 14, color: "#1c2b2d", marginTop: 4, lineHeight: 20 },
+  avisoReciente: {
+    fontSize: 12,
+    color: "#8a5a2b",
+    marginTop: 8,
+    lineHeight: 18,
+  },
+  fichaAcciones: { marginTop: 12 },
 });
