@@ -2,20 +2,34 @@
   "name": "@erasmusu/app",
   "version": "0.1.0",
   "private": true,
-  "main": "App.tsx",
+  "main": "index.js",
   "scripts": {
+    "start": "expo start",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "echo \"app: smoke visual en T3a; sin tests propios en T1\"",
-    "export": "npx expo export --platform all --output-dir dist-web 2>&1 | head -n 20"
+    "test": "echo \"app: smoke visual en T3a; sin tests propios en T1\""
   },
   "dependencies": {
     "@erasmusu/domain": "0.1.0",
-    "expo": "~52.0.0",
-    "react": "18.3.1",
-    "react-native": "0.76.5"
+    "@expo/dom-webview": "~57.0.1",
+    "@expo/log-box": "~57.0.4",
+    "@expo/metro-runtime": "~57.0.15",
+    "expo": "~57.0.22",
+    "expo-asset": "~57.0.17",
+    "expo-constants": "~57.0.18",
+    "expo-file-system": "~57.0.7",
+    "expo-font": "~57.0.4",
+    "expo-keep-awake": "~57.0.2",
+    "expo-modules-core": "~57.0.18",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
   },
   "devDependencies": {
-    "typescript": "~5.6.3",
-    "@types/react": "~18.3.12"
+    "@types/react": "~19.2.4",
+    "typescript": "~5.9.2"
+  },
+  "expo": {
+    "install": {
+      "exclude": ["typescript"]
+    }
   }
 }

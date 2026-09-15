@@ -1,12 +1,12 @@
-## Parent
+## Padre
 
-- #1 — Spec: Erasmusu v1 (seam `FuenteCatalog`, Roma, gratis/sin paywall)
+- #1 — Especificación: Erasmusu v1 (costura `FuenteCatalog`, Roma, gratis/sin paywall)
 
-## What to build
+## Qué construir
 
 Flujo de aporte (crear/corregir fuente): pin + foto obligatoria, con cuenta y presencia (~150 m), tope 5/día, rama de duplicado probable (ofrece señalar o corregir la existente en vez de duplicar en silencio) y flag de aviso de reciente al publicar. En este ticket la revisión de foto usa un fake de PhotoReview con las mismas decisiones (bloquear explícito, bloquear ornamental clara, dudar con aviso, permitir caño); el proveedor real llega en su ticket.
 
-## Acceptance criteria
+## Criterios de aceptación
 
 - [ ] Sin presencia no se puede aportar (mensaje claro).
 - [ ] Tope 5 aportes/día enforced por persona.
@@ -15,9 +15,9 @@ Flujo de aporte (crear/corregir fuente): pin + foto obligatoria, con cuenta y pr
 - [ ] Rama de revisión simulada verificada en tests (las 4 decisiones del fake).
 - [ ] Correcciones de fuente usan el mismo flujo y reglas (no hay camino solo-admin).
 
-## Blocked by
+## Bloqueado por
 
-- #{{T1}} — Seam `FuenteCatalog`.
-- #{{T2}} — Datos para el chequeo de duplicado.
-- #{{T3A}} — PresenceGate real.
-- #{{T4}} — Cuentas (aportar exige cuenta).
+- ##2 — Seam `FuenteCatalog`.
+- ##3 — Datos para el chequeo de duplicado.
+- ##5 — PresenceGate real.
+- ##4 — Cuentas (aportar exige cuenta).

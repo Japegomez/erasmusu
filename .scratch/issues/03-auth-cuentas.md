@@ -1,12 +1,12 @@
-## Parent
+## Padre
 
-- #1 — Spec: Erasmusu v1 (seam `FuenteCatalog`, Roma, gratis/sin paywall)
+- #1 — Especificación: Erasmusu v1 (costura `FuenteCatalog`, Roma, gratis/sin paywall)
 
-## What to build
+## Qué construir
 
 Cuentas de persona: alta/login con Apple, Google y email/contraseña, sesión persistente, y flag de admin en base de datos para operación del equipo (sin plan de pago). Descubrir fuentes sigue funcionando sin cuenta.
 
-## Acceptance criteria
+## Criterios de aceptación
 
 - [ ] Registro y login funcionan con Apple, Google y email/contraseña.
 - [ ] La sesión persiste entre aperturas; cerrar sesión no rompe el descubrimiento.
@@ -14,6 +14,6 @@ Cuentas de persona: alta/login con Apple, Google y email/contraseña, sesión pe
 - [ ] Sin paywall ni IAP en este ticket (la propina va en su propio ticket).
 - [ ] Tests de Auth con proveedores simulados.
 
-## Blocked by
+## Bloqueado por
 
-- #{{T1}} — Fundación + seam `FuenteCatalog`.
+- ##2 — Fundación + seam `FuenteCatalog`.

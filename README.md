@@ -4,7 +4,7 @@ Utilidad para que un recién llegado encuentre agua potable cerca. v1 gratis, si
 
 ## Toolchain T1
 
-- App: **Expo SDK 52 + React Native 0.76 + TypeScript** (un codebase iOS + Android, ADR-0002).
+- App: **Expo SDK 57 + React Native 0.86 + TypeScript** (un codebase iOS + Android, ADR-0002; alineado con Expo Go actual).
 - Backend/API: **Node 22 + TypeScript** (`backend/`, http estándar; datastore en memoria en T1, Postgres planificado sin cambiar la seam).
 - Dominio: **`FuenteCatalog`** en `packages/domain` (seam profunda única) + fakes en memoria (`PresenceGate` ~150 m, `PhotoReview`, `FountainImporter` potable-only).
 - Tests: **Vitest** (contrato del catálogo con solo fakes). CI: **GitHub Actions** (build + tests en cada push).

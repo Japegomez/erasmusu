@@ -1,18 +1,18 @@
-## Parent
+## Padre
 
-- #1 — Spec: Erasmusu v1 (seam `FuenteCatalog`, Roma, gratis/sin paywall)
+- #1 — Especificación: Erasmusu v1 (costura `FuenteCatalog`, Roma, gratis/sin paywall)
 
-## What to build
+## Qué construir
 
 Widgets iOS/Android del modo sed (“fuente a ~X m →”) leyendo el snapshot que produce `FuenteCatalog`, con deep-link a la app. Demo: widget instalado muestra distancia sin abrir la app.
 
-## Acceptance criteria
+## Criterios de aceptación
 
 - [ ] Widget iOS y widget Android muestran fuente cercana + distancia aproximada.
 - [ ] Leen el mismo snapshot del catálogo (no lógica duplicada).
 - [ ] Tap abre la app en la ficha/modo sed.
 - [ ] Sin red muestran último snapshot con antigüedad o estado vacío honesto.
 
-## Blocked by
+## Bloqueado por
 
-- #{{T3B}} — Caché/snapshot offline.
+- ##6 — Caché/snapshot offline.

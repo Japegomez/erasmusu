@@ -1,12 +1,12 @@
-## Problem Statement
+## Planteamiento del problema
 
 Un recién llegado en Roma tiene sed y no sabe qué puntos de agua son realmente potables (frente a ornamentales tipo Fontana di Trevi), cuáles siguen en servicio hoy, ni cómo llegar al más cercano sin depender de una app municipal genérica o de un mapa OSM que mezcla basura. Quiere un gesto inmediato (“tengo sed”), poder aportar y señalar con confianza (presencia, foto revisada), guardar favoritos, y hacerlo gratis, sin anuncios ni paywall.
 
-## Solution
+## Solución
 
 Erasmusu v1 es una app React Native (iOS + Android) centrada en **Roma**, con arquitectura preparada para **añadir otras ciudades más adelante** (p. ej. Barcelona, Madrid, Bilbao) sin reescribir el dominio. Incluye: import de fuentes potables, botón modo sed / fuente más cercana con caché offline y widget, ficha con estado operativo + frescura y atributos con conteo, aportes con foto y revisión (explícito + tipo + EXIF), señales en 2 taps, favoritos con cuenta, reconocimiento ligero, y aportación voluntaria “invita un caffè” que no desbloquea nada. El dominio se concentra detrás de una sola seam profunda: `FuenteCatalog`.
 
-## User Stories
+## Historias de usuario
 
 1. Como recién llegado sin cuenta, quiero abrir la app y pulsar “tengo sed”, para ver de inmediato la Fuente usable más cercana sin registrarme.
 2. Como recién llegado, quiero que Fuente más cercana ignore Fuentes ocultas y priorice las en servicio con frescura reciente, para no ser enviado a un pin seco o poco fiable.
@@ -51,7 +51,7 @@ Erasmusu v1 es una app React Native (iOS + Android) centrada en **Roma**, con ar
 41. Como recién llegado que más adelante use la app en otra ciudad soportada, quiero el mismo gesto “tengo sed” y las mismas reglas de confianza, para no aprender un producto distinto por ciudad.
 42. Como sistema, quiero modelar Ciudad soportada como concepto de primer nivel (v1 = solo Roma activa), para activar Barcelona, Madrid, Bilbao u otras sin rediseñar FuenteCatalog.
 
-## Implementation Decisions
+## Decisiones de implementación
 
 ### Arquitectura y seams
 - App React Native greenfield (iOS + Android), un solo codebase (ADR-0002).
@@ -98,7 +98,7 @@ Erasmusu v1 es una app React Native (iOS + Android) centrada en **Roma**, con ar
 - Abrir Maps usa mapas del SO con coordenadas de destino.
 - Widget y caché offline leen el mismo snapshot nearby que produce FuenteCatalog.
 
-## Testing Decisions
+## Decisiones de pruebas
 
 - Los buenos tests afirman **comportamiento externo** a través de las seams `FuenteCatalog` (y Auth/TipJar): dada ubicación, señales, fotos, imports → resultado de nearest, ocultar/mostrar, reglas de atributos, topes, resultados de revisión. No afirmar SQL interno, árboles de componentes RN ni helpers privados.
 - Preferir adapters fake/in-memory de PresenceGate, PhotoReview e Importer en tests unitarios/integración; un test de contrato fino por adapter real cuando se cablee.
@@ -106,7 +106,7 @@ Erasmusu v1 es una app React Native (iOS + Android) centrada en **Roma**, con ar
 - Prior art: ninguno en el repo (greenfield). Los tests de la seam del catálogo serán la plantilla de tickets posteriores.
 - Tests UI: pocos smokes (modo sed → detalle → abrir maps; aporte happy path mockeado). La matemática de confianza se queda en FuenteCatalog.
 
-## Out of Scope
+## Fuera de alcance
 
 - Comida, experiencias/eventos low-cost, chat/social, perfiles públicos ricos, ranking global, contadores personales de impacto, prueba social por universidad.
 - Turn-by-turn in-app y “fuentes en mi camino” con desvío de ruta.
@@ -115,7 +115,7 @@ Erasmusu v1 es una app React Native (iOS + Android) centrada en **Roma**, con ar
 - Distinguir nasone / fontanella / casa dell’acqua como tipos de producto.
 - Competir con Acea/Acquea en datos oficiales de calidad de laboratorio como requisito v1.
 
-## Further Notes
+## Notas adicionales
 
 - Contexto competitivo: Roma tiene Acquea; la diferenciación es confianza (solo potable, señales con presencia, revisión de foto, frescura/estado), modo sed offline y GTM Erasmus/recién llegado — no “más pines OSM”. Ver `docs/research/competidores-fuentes-app-stores.md`.
 - Vocabulario de dominio: `CONTEXT.md`. ADRs vinculantes: 0001–0008, 0010–0013 (0009 sustituido).

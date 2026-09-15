@@ -1,23 +1,23 @@
-## Parent
+## Padre
 
-- #1 — Spec: Erasmusu v1 (seam `FuenteCatalog`, Roma, gratis/sin paywall)
+- #1 — Especificación: Erasmusu v1 (costura `FuenteCatalog`, Roma, gratis/sin paywall)
 
-## What to build
+## Qué construir
 
 Cierre de app: navegación/shell, ajustes con selector de idioma (ES/CA/EU/IT/EN, todas las cadenas traducidas), estados vacíos y de error, y pulido visual global de las pantallas entregadas por los tickets verticales. Sin features nuevas.
 
-## Acceptance criteria
+## Criterios de aceptación
 
 - [ ] Las 5 lenguas cubren toda la UI con selector funcional.
 - [ ] Vacío/error/loading definidos en las pantallas principales.
 - [ ] Recorrido completo humo en verde (sed → detalle → maps; aporte; señal; favorito) en ES y otro idioma.
 - [ ] Cero anuncios y cero IAP de desbloqueo verificados en el build.
 
-## Blocked by
+## Bloqueado por
 
-- #{{T3A}} — Pantallas de descubrimiento/detalle.
-- #{{T4}} — Pantallas de cuenta.
-- #{{T5A}} — Pantalla de aporte.
-- #{{T6A}} — UI de señales.
-- #{{T7}} — Chips de atributos.
-- #{{T8}} — Pantalla de favoritos.
+- ##5 — Pantallas de descubrimiento/detalle.
+- ##4 — Pantallas de cuenta.
+- ##7 — Pantalla de aporte.
+- ##9 — UI de señales.
+- ##11 — Chips de atributos.
+- ##12 — Pantalla de favoritos.
