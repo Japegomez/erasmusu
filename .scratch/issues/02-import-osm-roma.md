@@ -8,11 +8,15 @@ Importar fuentes potables de Roma desde OpenStreetMap (solo potable: `amenity=dr
 
 ## Criterios de aceptación
 
-- [ ] Pines potables reales de Roma visibles en mapa y lista, sin cuenta.
-- [ ] Monumentos ornamentales no potables (caso Trevi) ausentes del catálogo aunque existan en OSM.
-- [ ] El importador acepta una segunda fuente municipal configurable (verificado con fixture, p. ej. formato “en servicio”).
-- [ ] Re-import no duplica: los mismos puntos OSM actualizan en vez de crear.
-- [ ] Tests del catálogo: import potable-only + idempotencia con fakes.
+- [x] Pines potables reales de Roma visibles en mapa y lista, sin cuenta.
+- [x] Monumentos ornamentales no potables (caso Trevi) ausentes del catálogo aunque existan en OSM.
+- [x] El importador acepta una segunda fuente municipal configurable (verificado con fixture, p. ej. formato “en servicio”).
+- [x] Re-import no duplica: los mismos puntos OSM actualizan en vez de crear.
+- [x] Tests del catálogo: import potable-only + idempotencia con fakes.
+
+## Investigación (T2)
+
+Otras fuentes evaluadas en `docs/research/fuentes-datos-import.md` (Acea/Acquea sin API, Madrid open data, BCN fonts, Bilbao/GeoBilbao).
 
 ## Bloqueado por
 

@@ -111,27 +111,116 @@ export interface FuenteBruta {
   ciudadId: string;
   /** Etiquetas OSM relevantes. */
   tags: Record<string, string | undefined>;
-  /** Estado municipal cuando el feed lo trae (p. ej. Madrid "en servicio"). */
+  /**
+   * Estado normalizado del feed municipal cuando existe
+   * (`en-servicio` | `fuera-de-servicio` | texto crudo).
+   */
   estadoMunicipal?: string;
+}
+
+/** Registro crudo del feed Madrid (ADR-0012; sin go-live). */
+export interface MadridMunicipalRegistro {
+  codigoInterno: string;
+  lat: number;
+  lon: number;
+  /** OPERATIVO, EN SERVICIO, FUERA DE SERVICIO, etc. */
+  estado: string;
+  ciudadId?: string;
+}
+
+/** Elemento mínimo de Overpass / OSM JSON. */
+export interface OsmElement {
+  type: string;
+  id: number;
+  lat?: number;
+  lon?: number;
+  center?: { lat: number; lon: number };
+  tags?: Record<string, string | undefined>;
+}
+
+/** Regla potable-only OSM (wiki amenity=drinking_water / Key:drinking_water). */
+export function esPotableOsm(tags: Record<string, string | undefined>): boolean {
+  return tags["amenity"] === "drinking_water" || tags["drinking_water"] === "yes";
+}
+
+/** Normaliza el estado del feed Madrid a valores de dominio. */
+export function normalizarEstadoMadrid(estado: string): string {
+  const e = estado.trim().toLowerCase();
+  if (
+    e === "operativo" ||
+    e === "en servicio" ||
+    e === "en-servicio" ||
+    e === "en_servicio"
+  ) {
+    return "en-servicio";
+  }
+  if (
+    e.includes("fuera") ||
+    e.includes("no operativo") ||
+    e.includes("averia") ||
+    e.includes("avería")
+  ) {
+    return "fuera-de-servicio";
+  }
+  return e;
+}
+
+export function parseOsmElements(
+  doc: { elements?: OsmElement[] },
+  ciudadId: string,
+): FuenteBruta[] {
+  const out: FuenteBruta[] = [];
+  for (const el of doc.elements ?? []) {
+    const lat = el.lat ?? el.center?.lat;
+    const lon = el.lon ?? el.center?.lon;
+    if (lat == null || lon == null) continue;
+    out.push({
+      idExterno: `osm-${el.type}-${el.id}`,
+      lat,
+      lon,
+      ciudadId,
+      tags: { ...(el.tags ?? {}) },
+    });
+  }
+  return out;
+}
+
+export function parseMadridMunicipal(
+  registros: readonly MadridMunicipalRegistro[],
+): FuenteBruta[] {
+  return registros.map((r) => ({
+    idExterno: `madrid-${r.codigoInterno}`,
+    lat: r.lat,
+    lon: r.lon,
+    ciudadId: r.ciudadId ?? "madrid",
+    tags: { amenity: "drinking_water", source: "madrid-municipal" },
+    estadoMunicipal: normalizarEstadoMadrid(r.estado),
+  }));
 }
 
 /** Seam interna: FountainImporter (OSM solo-potable, multi-fuente listo). */
 export interface FountainImporter {
   filtrarPotables(candidatas: FuenteBruta[]): FuenteBruta[];
+  /** Segunda fuente municipal configurable (fixture Madrid “en servicio”). */
+  desdeMadridMunicipal(registros: readonly MadridMunicipalRegistro[]): FuenteBruta[];
 }
 
 /**
- * Fake con la regla potable-only de T2: acepta `amenity=drinking_water`
- * o `drinking_water=yes`; excluye `amenity=fountain` decorativa sin
- * potabilidad. El diseño multi-fuente (Madrid "en servicio") llega en T2.
+ * Importador potable-only: acepta `amenity=drinking_water` o
+ * `drinking_water=yes`; excluye `amenity=fountain` decorativa sin
+ * potabilidad. Multi-fuente: `desdeMadridMunicipal` (ADR-0012).
  */
-export class FakeFountainImporter implements FountainImporter {
+export class PotableFountainImporter implements FountainImporter {
   filtrarPotables(candidatas: FuenteBruta[]): FuenteBruta[] {
-    return candidatas.filter((c) => {
-      const amenity = c.tags["amenity"];
-      const dw = c.tags["drinking_water"];
-      if (amenity === "drinking_water" || dw === "yes") return true;
-      return false;
-    });
+    return candidatas.filter((c) => esPotableOsm(c.tags));
+  }
+
+  desdeMadridMunicipal(
+    registros: readonly MadridMunicipalRegistro[],
+  ): FuenteBruta[] {
+    return this.filtrarPotables(parseMadridMunicipal(registros));
   }
 }
+
+/** @deprecated Preferir `PotableFountainImporter` (mismo comportamiento). */
+export const FakeFountainImporter = PotableFountainImporter;

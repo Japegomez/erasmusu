@@ -21,15 +21,19 @@
     "expo-keep-awake": "~57.0.2",
     "expo-modules-core": "~57.0.18",
     "react": "19.2.3",
-    "react-native": "0.86.3"
+    "react-native": "0.86.3",
+    "react-native-map-clustering": "^4.0.0",
+    "react-native-maps": "1.27.2"
   },
   "devDependencies": {
-    "@types/react": "~19.2.4",
+    "@types/react": "19.1.17",
     "typescript": "~5.9.2"
   },
   "expo": {
     "install": {
-      "exclude": ["typescript"]
+      "exclude": [
+        "typescript"
+      ]
     }
   }
 }
