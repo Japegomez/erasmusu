@@ -1,5 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  ActionSheetIOS,
+  Alert,
+  Animated,
   Button,
   FlatList,
   Linking,
@@ -10,7 +13,7 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import { Marker, Circle, PROVIDER_DEFAULT } from "react-native-maps";
+import MapView, { Marker, Circle, PROVIDER_DEFAULT } from "react-native-maps";
 import ClusteredMapView from "react-native-map-clustering";
 import * as Location from "expo-location";
 import {
@@ -25,16 +28,237 @@ import {
 /** Centro de Roma: fallback si no hay permiso de ubicación. */
 const ROMA = { lat: 41.9028, lon: 12.4964 };
 const NOMBRE_FUENTE = "Fuente";
+/**
+ * Delta máximo tras «Tengo sed». 0.01 seguía dejando clusters en Roma densa;
+ * ~0.0015 ≈ calle, suele sacar el pin del cluster.
+ */
+const DELTA_FOCO_SED_MAX = 0.0015;
+/** Margen extra de zoom: la fórmula delta↔zoom subestima frente a GeoViewport. */
+const MARGEN_ZOOM_DESCLUSTER = 2;
 
-/** URL de la app de mapas del sistema (ADR-0005: sin turn-by-turn in-app). */
-export function urlMapasSistema(lat: number, lon: number): string {
+type SuperClusterLike = {
+  getClusters: (
+    bbox: [number, number, number, number],
+    zoom: number,
+  ) => Array<{
+    id?: number | string;
+    properties: { cluster?: boolean; cluster_id?: number; identifier?: string };
+    geometry: { coordinates: [number, number] };
+  }>;
+  getLeaves: (
+    clusterId: number | string,
+    limit?: number,
+  ) => Array<{
+    properties: { identifier?: string };
+    geometry: { coordinates: [number, number] };
+  }>;
+  getClusterExpansionZoom: (clusterId: number | string) => number;
+};
+
+function hojaEsFuente(
+  leaf: {
+    properties: { identifier?: string };
+    geometry: { coordinates: [number, number] };
+  },
+  fuenteId: string,
+  lat: number,
+  lon: number,
+): boolean {
+  if (leaf.properties.identifier === fuenteId) return true;
+  const [lng, la] = leaf.geometry.coordinates;
+  return Math.abs(la - lat) < 1e-6 && Math.abs(lng - lon) < 1e-6;
+}
+
+function clusterQueContieneFuente(
+  sc: SuperClusterLike,
+  fuenteId: string,
+  lat: number,
+  lon: number,
+  zoom: number,
+) {
+  const features = sc.getClusters([-180, -85, 180, 85], zoom);
+  for (const f of features) {
+    if (!f.properties.cluster) continue;
+    const clusterId = f.properties.cluster_id ?? f.id;
+    if (clusterId == null) continue;
+    const leaves = sc.getLeaves(clusterId, Infinity);
+    if (leaves.some((leaf) => hojaEsFuente(leaf, fuenteId, lat, lon))) {
+      return { ...f, id: clusterId };
+    }
+  }
+  return null;
+}
+
+/**
+ * Zoom en el que la fuente deja de estar en un cluster, más margen
+ * para compensar la conversión a latitudeDelta.
+ */
+function zoomSinCluster(
+  sc: SuperClusterLike,
+  fuenteId: string,
+  lat: number,
+  lon: number,
+  zoomPartida = 0,
+): number {
+  let zoom = Math.max(0, Math.floor(zoomPartida));
+  let vioCluster = false;
+  for (let i = 0; i < 16; i++) {
+    const cluster = clusterQueContieneFuente(sc, fuenteId, lat, lon, zoom);
+    if (!cluster) {
+      // Si nunca vimos cluster (matching falló), forzar zoom de calle.
+      if (!vioCluster) return 18;
+      return zoom + MARGEN_ZOOM_DESCLUSTER;
+    }
+    vioCluster = true;
+    const siguiente = sc.getClusterExpansionZoom(cluster.id);
+    if (siguiente <= zoom) return zoom + 1 + MARGEN_ZOOM_DESCLUSTER;
+    zoom = siguiente;
+  }
+  return zoom + MARGEN_ZOOM_DESCLUSTER;
+}
+
+function deltaDesdeZoom(zoom: number): number {
+  return 360 / Math.pow(2, Math.max(zoom, 1));
+}
+
+function regionFocoFuente(
+  sc: SuperClusterLike | null,
+  fuente: { id: string; lat: number; lon: number },
+) {
+  const zoom = sc
+    ? zoomSinCluster(sc, fuente.id, fuente.lat, fuente.lon)
+    : 18;
+  const delta = Math.min(deltaDesdeZoom(zoom), DELTA_FOCO_SED_MAX);
+  return {
+    latitude: fuente.lat,
+    longitude: fuente.lon,
+    latitudeDelta: delta,
+    longitudeDelta: delta,
+  };
+}
+
+/** Destinos externos (ADR-0005: sin turn-by-turn in-app). */
+type OpcionMapa = {
+  titulo: string;
+  /** URL preferida (app nativa si existe). */
+  url: string;
+  /** Si falla la app, abrir esta (https). */
+  fallback?: string;
+};
+
+export function opcionesAbrirEnMapas(lat: number, lon: number): OpcionMapa[] {
+  const dest = `${lat},${lon}`;
+  const label = encodeURIComponent(NOMBRE_FUENTE);
+  const web = `https://www.google.com/maps/dir/?api=1&destination=${dest}`;
+  const opciones: OpcionMapa[] = [];
+
   if (Platform.OS === "ios") {
-    return `http://maps.apple.com/?daddr=${lat},${lon}`;
+    opciones.push({
+      titulo: "Apple Maps",
+      url: `http://maps.apple.com/?daddr=${dest}&dirflg=w`,
+    });
   }
+
+  opciones.push({
+    titulo: "Google Maps",
+    url:
+      Platform.OS === "ios"
+        ? `comgooglemaps://?daddr=${dest}&directionsmode=walking`
+        : `google.navigation:q=${dest}`,
+    fallback: web,
+  });
+
+  opciones.push({
+    titulo: "Waze",
+    url: `waze://?ll=${dest}&navigate=yes`,
+    fallback: `https://waze.com/ul?ll=${dest}&navigate=yes`,
+  });
+
   if (Platform.OS === "android") {
-    return `geo:${lat},${lon}?q=${lat},${lon}(${encodeURIComponent(NOMBRE_FUENTE)})`;
+    opciones.push({
+      titulo: "Otras apps de mapas",
+      url: `geo:${lat},${lon}?q=${lat},${lon}(${label})`,
+      fallback: web,
+    });
   }
-  return `https://www.google.com/maps/dir/?api=1&destination=${lat},${lon}`;
+
+  opciones.push({
+    titulo: "Abrir en el navegador",
+    url: web,
+  });
+
+  return opciones;
+}
+
+async function abrirUrlMapa(opcion: OpcionMapa): Promise<void> {
+  try {
+    const puede = await Linking.canOpenURL(opcion.url);
+    if (puede) {
+      await Linking.openURL(opcion.url);
+      return;
+    }
+  } catch {
+    // Schemes no declarados pueden lanzar; caemos al fallback.
+  }
+  if (opcion.fallback) {
+    await Linking.openURL(opcion.fallback);
+    return;
+  }
+  await Linking.openURL(opcion.url);
+}
+
+/** Muestra Apple Maps / Google Maps / Waze / otras (según plataforma). */
+export async function mostrarSelectorMapas(
+  lat: number,
+  lon: number,
+): Promise<void> {
+  const opciones = opcionesAbrirEnMapas(lat, lon);
+
+  if (Platform.OS === "ios") {
+    return new Promise((resolve) => {
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          title: "Abrir en mapas",
+          message: "Elige una app para llegar a la fuente",
+          options: [...opciones.map((o) => o.titulo), "Cancelar"],
+          cancelButtonIndex: opciones.length,
+        },
+        (indice) => {
+          if (indice === opciones.length || indice == null) {
+            resolve();
+            return;
+          }
+          const elegida = opciones[indice];
+          if (!elegida) {
+            resolve();
+            return;
+          }
+          void abrirUrlMapa(elegida).finally(resolve);
+        },
+      );
+    });
+  }
+
+  return new Promise((resolve) => {
+    Alert.alert(
+      "Abrir en mapas",
+      "Elige una app para llegar a la fuente",
+      [
+        ...opciones.map((opcion) => ({
+          text: opcion.titulo,
+          onPress: () => {
+            void abrirUrlMapa(opcion).finally(resolve);
+          },
+        })),
+        {
+          text: "Cancelar",
+          style: "cancel" as const,
+          onPress: () => resolve(),
+        },
+      ],
+      { cancelable: true, onDismiss: () => resolve() },
+    );
+  });
 }
 
 function textoEstado(estado: FuentePublica["estado"]): string {
@@ -80,6 +304,16 @@ export default function App() {
   const [seleccionId, setSeleccionId] = useState<string | undefined>();
   const [vista, setVista] = useState<"mapa" | "lista">("mapa");
   const [mensajeSed, setMensajeSed] = useState<string | null>(null);
+  /** Dispara recentrado del mapa hacia la fuente del gesto sed. */
+  const [focoSed, setFocoSed] = useState<{
+    id: string;
+    lat: number;
+    lon: number;
+    nonce: number;
+  } | null>(null);
+  const mapRef = useRef<MapView | null>(null);
+  const superClusterRef = useRef<SuperClusterLike | null>(null);
+  const fichaAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     let cancelado = false;
@@ -125,6 +359,43 @@ export default function App() {
     setSeleccionId(f.id);
   };
 
+  useEffect(() => {
+    if (!seleccionId) return;
+    fichaAnim.setValue(0);
+    Animated.timing(fichaAnim, {
+      toValue: 1,
+      duration: 220,
+      useNativeDriver: true,
+    }).start();
+  }, [seleccionId, fichaAnim]);
+
+  useEffect(() => {
+    if (vista !== "mapa" || !focoSed) return;
+    let cancelado = false;
+    let intento = 0;
+
+    const enfocar = () => {
+      if (cancelado) return;
+      const sc = superClusterRef.current;
+      if (!sc && intento < 12) {
+        intento += 1;
+        setTimeout(enfocar, 40);
+        return;
+      }
+      mapRef.current?.animateToRegion(regionFocoFuente(sc, focoSed), 550);
+      // Suelta el foco tras la animación para no pelear con el zoom manual.
+      setTimeout(() => {
+        if (!cancelado) setFocoSed(null);
+      }, 600);
+    };
+
+    const t = setTimeout(enfocar, 50);
+    return () => {
+      cancelado = true;
+      clearTimeout(t);
+    };
+  }, [vista, focoSed]);
+
   const tengoSed = () => {
     const f = catalog.masCercana({ ...origen, ciudadId: "roma" });
     if (!f) {
@@ -132,12 +403,14 @@ export default function App() {
       return;
     }
     seleccionar(f);
+    setVista("mapa");
+    setFocoSed({ id: f.id, lat: f.lat, lon: f.lon, nonce: Date.now() });
     setMensajeSed(`${NOMBRE_FUENTE} usable a ${Math.round(f.distanciaM)} m`);
   };
 
   const abrirEnMapas = () => {
     if (!seleccion) return;
-    void Linking.openURL(urlMapasSistema(seleccion.lat, seleccion.lon));
+    void mostrarSelectorMapas(seleccion.lat, seleccion.lon);
   };
 
   const origenLabel =
@@ -175,6 +448,8 @@ export default function App() {
       {vista === "mapa" ? (
         <ClusteredMapView
           key={`mapa-${origen.lat.toFixed(4)}-${origen.lon.toFixed(4)}`}
+          ref={mapRef}
+          superClusterRef={superClusterRef}
           style={{ height: height * 0.48, width: "100%" }}
           provider={PROVIDER_DEFAULT}
           initialRegion={{
@@ -192,30 +467,50 @@ export default function App() {
           spiralEnabled={false}
           showsUserLocation={gpsEstado === "ok"}
         >
-          {fuentes.map((f) => (
-            <Marker
-              key={f.id}
-              identifier={f.id}
-              coordinate={{ latitude: f.lat, longitude: f.lon }}
-              title={NOMBRE_FUENTE}
-              description={`${Math.round(f.distanciaM)} m`}
-              pinColor="#c45c26"
-              tracksViewChanges={false}
-              onPress={(e) => {
-                e.stopPropagation();
-                seleccionar(f);
-              }}
-            />
-          ))}
+          {fuentes
+            .filter((f) => f.id !== seleccionId)
+            .map((f) => (
+              <Marker
+                key={f.id}
+                identifier={f.id}
+                coordinate={{ latitude: f.lat, longitude: f.lon }}
+                pinColor="#c45c26"
+                tracksViewChanges={false}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  seleccionar(f);
+                }}
+              />
+            ))}
           {seleccion ? (
-            <Circle
-              center={{ latitude: seleccion.lat, longitude: seleccion.lon }}
-              radius={35}
-              strokeColor="#0b6e4f"
-              fillColor="rgba(11, 110, 79, 0.28)"
-              strokeWidth={2}
-              zIndex={1}
-            />
+            <>
+              {/* Fuera de clustering: sigue visible al hacer zoom out. */}
+              <Marker
+                key={`sel-${seleccion.id}`}
+                identifier={seleccion.id}
+                coordinate={{
+                  latitude: seleccion.lat,
+                  longitude: seleccion.lon,
+                }}
+                pinColor="#0b6e4f"
+                // Convención de react-native-map-clustering: no entra en SuperCluster.
+                {...({ cluster: false } as { cluster: boolean })}
+                zIndex={10}
+                tracksViewChanges={false}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  seleccionar(seleccion);
+                }}
+              />
+              <Circle
+                center={{ latitude: seleccion.lat, longitude: seleccion.lon }}
+                radius={45}
+                strokeColor="#0b6e4f"
+                fillColor="rgba(11, 110, 79, 0.32)"
+                strokeWidth={3}
+                zIndex={9}
+              />
+            </>
           ) : null}
         </ClusteredMapView>
       ) : (
@@ -241,7 +536,22 @@ export default function App() {
         />
       )}
 
-      <View style={estilos.ficha}>
+      <Animated.View
+        style={[
+          estilos.ficha,
+          {
+            opacity: fichaAnim,
+            transform: [
+              {
+                translateY: fichaAnim.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [14, 0],
+                }),
+              },
+            ],
+          },
+        ]}
+      >
         {seleccion ? (
           <>
             <Text style={estilos.fichaTitulo}>{NOMBRE_FUENTE}</Text>
@@ -270,7 +580,7 @@ export default function App() {
             Pulsa «Tengo sed» o elige un pin.
           </Text>
         )}
-      </View>
+      </Animated.View>
     </View>
   );
 }
