@@ -107,12 +107,24 @@ export class InMemoryFuenteCatalog {
 
   // ---- Import ----
 
-  /** Importa candidatas; devuelve nº de creadas (idempotente por idExterno). */
+  /**
+   * Importa candidatas; devuelve nº de creadas.
+   * Re-import con el mismo idExterno actualiza lat/lon/estado (no duplica).
+   */
   importar(candidatas: FuenteBruta[]): number {
     const potables = this.importer.filtrarPotables(candidatas);
     let creadas = 0;
+    const ahoraIso = this.ahora().toISOString();
     for (const c of potables) {
-      if (this.porExterno.has(c.idExterno)) continue;
+      const existenteId = this.porExterno.get(c.idExterno);
+      if (existenteId) {
+        const f = this.fuentes.get(existenteId);
+        if (!f) continue;
+        f.lat = c.lat;
+        f.lon = c.lon;
+        this.aplicarEstadoMunicipal(f, c.estadoMunicipal, ahoraIso);
+        continue;
+      }
       const id = `f-${this.seq++}`;
       const fuente: Fuente = {
         id,
@@ -135,11 +147,26 @@ export class InMemoryFuenteCatalog {
         },
         idExterno: c.idExterno,
       };
+      this.aplicarEstadoMunicipal(fuente, c.estadoMunicipal, ahoraIso);
       this.fuentes.set(id, fuente);
       this.porExterno.set(c.idExterno, id);
       creadas++;
     }
     return creadas;
+  }
+
+  private aplicarEstadoMunicipal(
+    f: Fuente,
+    estadoMunicipal: string | undefined,
+    ahoraIso: string,
+  ): void {
+    if (estadoMunicipal === "en-servicio") {
+      f.estado = "en-servicio";
+      f.lastConfirmedAt = ahoraIso;
+    } else if (estadoMunicipal === "fuera-de-servicio") {
+      f.estado = "seca";
+      f.lastConfirmedAt = ahoraIso;
+    }
   }
 
   // ---- Descubrimiento (sin cuenta, ignora ocultas) ----

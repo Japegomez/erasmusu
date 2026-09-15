@@ -1,25 +1,23 @@
-# Erasmusu v1 — Roma (T1: fundación)
+# Erasmusu v1 — Roma (T2: import OSM + mapa/lista)
 
 Utilidad para que un recién llegado encuentre agua potable cerca. v1 gratis, sin anuncios ni paywall (única transacción: aportación voluntaria “invita un caffè”). Ver `CONTEXT.md` y `spec-v1-roma.md`.
 
-## Toolchain T1
+## Toolchain
 
-- App: **Expo SDK 57 + React Native 0.86 + TypeScript** (un codebase iOS + Android, ADR-0002; alineado con Expo Go actual).
-- Backend/API: **Node 22 + TypeScript** (`backend/`, http estándar; datastore en memoria en T1, Postgres planificado sin cambiar la seam).
-- Dominio: **`FuenteCatalog`** en `packages/domain` (seam profunda única) + fakes en memoria (`PresenceGate` ~150 m, `PhotoReview`, `FountainImporter` potable-only).
-- Tests: **Vitest** (contrato del catálogo con solo fakes). CI: **GitHub Actions** (build + tests en cada push).
+- App: **Expo SDK 57 + React Native 0.86 + TypeScript** + `react-native-maps` (mapa/lista T2).
+- Backend/API: **Node 22 + TypeScript** (`backend/`, http estándar; datastore en memoria con seed OSM Roma).
+- Dominio: **`FuenteCatalog`** en `packages/domain` + `FountainImporter` multi-fuente (OSM potable-only + fixture Madrid).
+- Tests: **Vitest**. CI: **GitHub Actions**.
 
 ## Clon fresco
 
 ```sh
 npm install
-# Clon fresco: hay que emitir dist/ de @erasmusu/domain antes del typecheck
-# de backend/app (el script raíz ya lo hace; CI también).
 npm run typecheck
 npm run test --workspaces
 ```
 
-Backend en local:
+Backend (siembra ~170+ pines potables OSM Roma):
 
 ```sh
 npm run build --workspace=@erasmusu/backend
@@ -28,25 +26,18 @@ npm run start --workspace=@erasmusu/backend
 # GET http://localhost:3000/fuentes/cercanas?lat=41.9028&lon=12.4964&ciudadId=roma
 ```
 
-App (Expo, un codebase iOS + Android):
+App:
 
 ```sh
 npm install --workspace=@erasmusu/app
-npx expo start --tunnel        # desarrollo
-npx expo run:ios               # binario iOS (requiere macOS + Xcode)
-npx expo run:android           # binario Android (requiere Android SDK)
+npx expo start --tunnel
 ```
 
-Binarios de tienda vía EAS (`eas build -p ios|android`) — en CI Linux solo se
-verifica typecheck del shell; la compilación nativa se hace en EAS/ runners
-macOS en tickets de entrega.
+Datos OSM: ODbL © OpenStreetMap contributors. Investigación de otras fuentes: `docs/research/fuentes-datos-import.md`.
 
-## Seam `FuenteCatalog` (nombres T1)
+## Seam `FuenteCatalog`
 
 `cercanas · masCercana · detalle · importar · aportar · senalar ·
 marcarAtributo/desmarcarAtributo · toggleFavorito/favoritosDe · snapshotSed`
-con adapters internos `PresenceGate`, `PhotoReview`, `FountainImporter`.
-Contrato en `packages/domain/tests/catalog.contract.test.ts` (8 tests en verde).
-
-Matemática completa de confianza (quórum + proporción + asimetría) y
-PhotoReview real llegan en T6b/T5b sin cambiar esta interfaz.
+con adapters `PresenceGate`, `PhotoReview`, `FountainImporter`
+(`filtrarPotables`, `desdeMadridMunicipal`).
