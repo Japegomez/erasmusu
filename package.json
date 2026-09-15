@@ -9,8 +9,9 @@
     "app"
   ],
   "scripts": {
+    "build:domain": "npm run build --workspace=@erasmusu/domain",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present",
+    "typecheck": "npm run build:domain && npm run typecheck --workspaces --if-present",
     "build": "npm run build --workspaces --if-present"
   },
   "devDependencies": {

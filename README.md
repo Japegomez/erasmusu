@@ -13,7 +13,9 @@ Utilidad para que un recién llegado encuentre agua potable cerca. v1 gratis, si
 
 ```sh
 npm install
-npm run typecheck --workspaces
+# Clon fresco: hay que emitir dist/ de @erasmusu/domain antes del typecheck
+# de backend/app (el script raíz ya lo hace; CI también).
+npm run typecheck
 npm run test --workspaces
 ```
 

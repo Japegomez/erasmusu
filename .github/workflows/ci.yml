@@ -14,6 +14,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm install --no-audit --no-fund
+      # Clon fresco: dist/ no está en git; consumidores resuelven @erasmusu/domain vía dist/.
+      - run: npm run build --workspace=@erasmusu/domain
       - run: npm run typecheck --workspaces --if-present
       - run: npm run test --workspaces --if-present
       - run: npm run build --workspaces --if-present
