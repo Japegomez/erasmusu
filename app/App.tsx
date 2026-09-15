@@ -55,6 +55,7 @@ type SuperClusterLike = {
   getClusterExpansionZoom: (clusterId: number | string) => number;
 };
 
+/** True si la hoja de SuperCluster corresponde a la fuente (id o coords). */
 function hojaEsFuente(
   leaf: {
     properties: { identifier?: string };
@@ -69,6 +70,7 @@ function hojaEsFuente(
   return Math.abs(la - lat) < 1e-6 && Math.abs(lng - lon) < 1e-6;
 }
 
+/** Cluster de SuperCluster cuyas hojas incluyen la fuente dada. */
 function clusterQueContieneFuente(
   sc: SuperClusterLike,
   fuenteId: string,
@@ -117,10 +119,12 @@ function zoomSinCluster(
   return zoom + MARGEN_ZOOM_DESCLUSTER;
 }
 
+/** Convierte nivel de zoom de mapa a latitudeDelta aproximado. */
 function deltaDesdeZoom(zoom: number): number {
   return 360 / Math.pow(2, Math.max(zoom, 1));
 }
 
+/** Región centrada en la fuente con zoom suficiente para salir del cluster. */
 function regionFocoFuente(
   sc: SuperClusterLike | null,
   fuente: { id: string; lat: number; lon: number },
@@ -146,6 +150,7 @@ type OpcionMapa = {
   fallback?: string;
 };
 
+/** Lista de apps/URLs candidatas para llegar a la fuente (según plataforma). */
 export function opcionesAbrirEnMapas(lat: number, lon: number): OpcionMapa[] {
   const dest = `${lat},${lon}`;
   const label = encodeURIComponent(NOMBRE_FUENTE);
@@ -190,6 +195,7 @@ export function opcionesAbrirEnMapas(lat: number, lon: number): OpcionMapa[] {
   return opciones;
 }
 
+/** Abre la URL nativa de la opción o su fallback https si no está instalada. */
 async function abrirUrlMapa(opcion: OpcionMapa): Promise<void> {
   try {
     const puede = await Linking.canOpenURL(opcion.url);
@@ -240,27 +246,25 @@ export async function mostrarSelectorMapas(
   }
 
   return new Promise((resolve) => {
+    // Android Alert solo respeta 3 botones; cancelación = dismiss del diálogo.
+    const opcionesAndroid = opciones.filter(
+      (opcion) => opcion.titulo !== "Abrir en el navegador",
+    );
     Alert.alert(
       "Abrir en mapas",
       "Elige una app para llegar a la fuente",
-      [
-        ...opciones.map((opcion) => ({
-          text: opcion.titulo,
-          onPress: () => {
-            void abrirUrlMapa(opcion).finally(resolve);
-          },
-        })),
-        {
-          text: "Cancelar",
-          style: "cancel" as const,
-          onPress: () => resolve(),
+      opcionesAndroid.map((opcion) => ({
+        text: opcion.titulo,
+        onPress: () => {
+          void abrirUrlMapa(opcion).finally(resolve);
         },
-      ],
+      })),
       { cancelable: true, onDismiss: () => resolve() },
     );
   });
 }
 
+/** Etiqueta legible del estado operativo de una fuente. */
 function textoEstado(estado: FuentePublica["estado"]): string {
   switch (estado) {
     case "en-servicio":
@@ -274,6 +278,7 @@ function textoEstado(estado: FuentePublica["estado"]): string {
   }
 }
 
+/** Texto de frescura («confirmada hace X días») o null si no hay fecha. */
 function textoFrescura(dias: number | null): string | null {
   if (dias === null) return null;
   if (dias === 0) return "confirmada hoy";
@@ -397,6 +402,10 @@ export default function App() {
   }, [vista, focoSed]);
 
   const tengoSed = () => {
+    if (gpsEstado === "pendiente") {
+      setMensajeSed("Esperando ubicación…");
+      return;
+    }
     const f = catalog.masCercana({ ...origen, ciudadId: "roma" });
     if (!f) {
       setMensajeSed("Sin fuente usable cerca (ocultas/secas excluidas).");
@@ -427,7 +436,12 @@ export default function App() {
         <Text style={estilos.sub}>
           {fuentes.length} fuentes potables · sin cuenta · {origenLabel}
         </Text>
-        <Button title="Tengo sed" onPress={tengoSed} color="#0b6e4f" />
+        <Button
+          title="Tengo sed"
+          onPress={tengoSed}
+          color="#0b6e4f"
+          disabled={gpsEstado === "pendiente"}
+        />
         {mensajeSed ? <Text style={estilos.sed}>{mensajeSed}</Text> : null}
         <View style={estilos.tabs}>
           <Pressable

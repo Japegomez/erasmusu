@@ -197,7 +197,7 @@ export class InMemoryFuenteCatalog {
    * prioriza en-servicio y luego frescura (confirmada hace menos días).
    */
   masCercana(args: CercanasArgs): FuentePublica | undefined {
-    return this.cercanas({ ...args, limite: 10_000 })
+    return this.cercanas({ ...args, limite: Number.MAX_SAFE_INTEGER })
       .filter((f) => f.estado !== "seca")
       .sort((a, b) => {
         const porDistancia = a.distanciaM - b.distanciaM;

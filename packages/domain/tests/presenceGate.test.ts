@@ -5,7 +5,7 @@ import {
   distanciaM,
 } from "../src/adapters.js";
 
-/** ~1° lat ≈ 111_320 m; desplazamiento N en metros → grados. */
+/** Desplaza un punto hacia el norte en metros (≈1° lat = 111_320 m). */
 function norteDe(lat: number, lon: number, metros: number) {
   return { lat: lat + metros / 111_320, lon };
 }

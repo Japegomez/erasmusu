@@ -92,7 +92,7 @@ describe("FuenteCatalog (contrato T1, solo fakes)", () => {
     expect(cat.detalle(oculta.id)?.oculta).toBe(true);
   });
 
-  it("modo sed: masCercana ignora secas y prioriza en-servicio con frescura", async () => {
+  it("modo sed: masCercana ignora secas", async () => {
     const cat = new InMemoryFuenteCatalog(deps());
     cat.importar([
       {
@@ -103,19 +103,12 @@ describe("FuenteCatalog (contrato T1, solo fakes)", () => {
         tags: { amenity: "drinking_water" },
       },
       {
-        idExterno: "fresca",
+        idExterno: "usable",
         lat: ROMA.lat + 0.002,
         lon: ROMA.lon,
         ciudadId: "roma",
         tags: { amenity: "drinking_water" },
         estadoMunicipal: "en-servicio",
-      },
-      {
-        idExterno: "vieja-igual-dist",
-        lat: ROMA.lat + 0.002,
-        lon: ROMA.lon + 0.00001,
-        ciudadId: "roma",
-        tags: { amenity: "drinking_water" },
       },
     ]);
     const seca = cat.cercanas({ ...ROMA }).find((f) => f.idExterno === "seca-cerca")!;
@@ -128,14 +121,66 @@ describe("FuenteCatalog (contrato T1, solo fakes)", () => {
       personaLon: seca.lon,
     });
 
-    // Mapa/lista pueden seguir mostrando la seca; el gesto sed no la elige.
     expect(cat.cercanas({ ...ROMA }).some((f) => f.idExterno === "seca-cerca")).toBe(
       true,
     );
     const sed = cat.masCercana({ ...ROMA });
-    expect(sed?.idExterno).not.toBe("seca-cerca");
+    expect(sed?.idExterno).toBe("usable");
     expect(sed?.estado).toBe("en-servicio");
+  });
+
+  it("modo sed: a igual distancia prioriza en-servicio sobre desconocido", () => {
+    const cat = new InMemoryFuenteCatalog(deps());
+    cat.importar([
+      {
+        idExterno: "desconocida",
+        lat: ROMA.lat + 0.002,
+        lon: ROMA.lon,
+        ciudadId: "roma",
+        tags: { amenity: "drinking_water" },
+      },
+      {
+        idExterno: "servida",
+        lat: ROMA.lat + 0.002,
+        lon: ROMA.lon,
+        ciudadId: "roma",
+        tags: { amenity: "drinking_water" },
+        estadoMunicipal: "en-servicio",
+      },
+    ]);
+    expect(cat.masCercana({ ...ROMA })?.idExterno).toBe("servida");
+  });
+
+  it("modo sed: a igual distancia y en-servicio, prioriza la más fresca", () => {
+    let ahora = new Date("2026-09-01T10:00:00.000Z");
+    const cat = new InMemoryFuenteCatalog({
+      ...deps(),
+      ahora: () => ahora,
+    });
+    cat.importar([
+      {
+        idExterno: "vieja-igual-dist",
+        lat: ROMA.lat + 0.002,
+        lon: ROMA.lon,
+        ciudadId: "roma",
+        tags: { amenity: "drinking_water" },
+        estadoMunicipal: "en-servicio",
+      },
+    ]);
+    ahora = new Date("2026-09-14T10:00:00.000Z");
+    cat.importar([
+      {
+        idExterno: "fresca",
+        lat: ROMA.lat + 0.002,
+        lon: ROMA.lon,
+        ciudadId: "roma",
+        tags: { amenity: "drinking_water" },
+        estadoMunicipal: "en-servicio",
+      },
+    ]);
+    const sed = cat.masCercana({ ...ROMA });
     expect(sed?.idExterno).toBe("fresca");
+    expect(sed?.confirmadaHaceDias).toBe(0);
   });
 
   it("ficha pública: confirmadaHaceDias y aviso de reciente", async () => {
