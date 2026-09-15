@@ -70,11 +70,155 @@ describe("FuenteCatalog (contrato T1, solo fakes)", () => {
         ciudadId: "roma",
         tags: { amenity: "drinking_water" },
       },
+      {
+        idExterno: "oculta-cerca",
+        lat: ROMA.lat + 0.0005,
+        lon: ROMA.lon,
+        ciudadId: "roma",
+        tags: { amenity: "drinking_water" },
+      },
     ]);
+    const oculta = cat.cercanas({ ...ROMA, ciudadId: "roma" }).find(
+      (f) => f.idExterno === "oculta-cerca",
+    )!;
+    cat.forzarOculta(oculta.id, true);
+
     const todas = cat.cercanas({ ...ROMA, ciudadId: "roma" });
     expect(todas.map((f) => f.idExterno)).toEqual(["b", "a"]);
+    expect(todas.some((f) => f.oculta)).toBe(false);
     const mas = cat.masCercana({ ...ROMA });
     expect(mas?.idExterno).toBe("b");
+    // Ocultación blanda: detalle aún deja rastro
+    expect(cat.detalle(oculta.id)?.oculta).toBe(true);
+  });
+
+  it("modo sed: masCercana ignora secas", async () => {
+    const cat = new InMemoryFuenteCatalog(deps());
+    cat.importar([
+      {
+        idExterno: "seca-cerca",
+        lat: ROMA.lat + 0.0005,
+        lon: ROMA.lon,
+        ciudadId: "roma",
+        tags: { amenity: "drinking_water" },
+      },
+      {
+        idExterno: "usable",
+        lat: ROMA.lat + 0.002,
+        lon: ROMA.lon,
+        ciudadId: "roma",
+        tags: { amenity: "drinking_water" },
+        estadoMunicipal: "en-servicio",
+      },
+    ]);
+    const seca = cat.cercanas({ ...ROMA }).find((f) => f.idExterno === "seca-cerca")!;
+    await cat.senalar({
+      personaId: "p1",
+      conCuenta: true,
+      fuenteId: seca.id,
+      tipo: "seca",
+      personaLat: seca.lat,
+      personaLon: seca.lon,
+    });
+
+    expect(cat.cercanas({ ...ROMA }).some((f) => f.idExterno === "seca-cerca")).toBe(
+      true,
+    );
+    const sed = cat.masCercana({ ...ROMA });
+    expect(sed?.idExterno).toBe("usable");
+    expect(sed?.estado).toBe("en-servicio");
+  });
+
+  it("modo sed: a igual distancia prioriza en-servicio sobre desconocido", () => {
+    const cat = new InMemoryFuenteCatalog(deps());
+    cat.importar([
+      {
+        idExterno: "desconocida",
+        lat: ROMA.lat + 0.002,
+        lon: ROMA.lon,
+        ciudadId: "roma",
+        tags: { amenity: "drinking_water" },
+      },
+      {
+        idExterno: "servida",
+        lat: ROMA.lat + 0.002,
+        lon: ROMA.lon,
+        ciudadId: "roma",
+        tags: { amenity: "drinking_water" },
+        estadoMunicipal: "en-servicio",
+      },
+    ]);
+    expect(cat.masCercana({ ...ROMA })?.idExterno).toBe("servida");
+  });
+
+  it("modo sed: a igual distancia y en-servicio, prioriza la más fresca", () => {
+    let ahora = new Date("2026-09-01T10:00:00.000Z");
+    const cat = new InMemoryFuenteCatalog({
+      ...deps(),
+      ahora: () => ahora,
+    });
+    cat.importar([
+      {
+        idExterno: "vieja-igual-dist",
+        lat: ROMA.lat + 0.002,
+        lon: ROMA.lon,
+        ciudadId: "roma",
+        tags: { amenity: "drinking_water" },
+        estadoMunicipal: "en-servicio",
+      },
+    ]);
+    ahora = new Date("2026-09-14T10:00:00.000Z");
+    cat.importar([
+      {
+        idExterno: "fresca",
+        lat: ROMA.lat + 0.002,
+        lon: ROMA.lon,
+        ciudadId: "roma",
+        tags: { amenity: "drinking_water" },
+        estadoMunicipal: "en-servicio",
+      },
+    ]);
+    const sed = cat.masCercana({ ...ROMA });
+    expect(sed?.idExterno).toBe("fresca");
+    expect(sed?.confirmadaHaceDias).toBe(0);
+  });
+
+  it("ficha pública: confirmadaHaceDias y aviso de reciente", async () => {
+    let ahora = new Date("2026-09-14T10:00:00.000Z");
+    const cat = new InMemoryFuenteCatalog({
+      ...deps(),
+      ahora: () => ahora,
+    });
+    const ok = await cat.aportar({
+      personaId: "p1",
+      conCuenta: true,
+      lat: ROMA.lat + 0.01,
+      lon: ROMA.lon,
+      personaLat: ROMA.lat + 0.01,
+      personaLon: ROMA.lon,
+      ciudadId: "roma",
+      foto: { ref: "f1", marcaTest: "cano" },
+    });
+    expect(ok.creada?.reciente).toBe(true);
+    expect(ok.creada?.confirmadaHaceDias).toBe(0);
+
+    cat.importar([
+      {
+        idExterno: "confirmada",
+        lat: ROMA.lat,
+        lon: ROMA.lon,
+        ciudadId: "roma",
+        tags: { amenity: "drinking_water" },
+        estadoMunicipal: "en-servicio",
+      },
+    ]);
+    ahora = new Date("2026-09-20T10:00:00.000Z");
+    const ficha = cat.detalle(
+      cat.cercanas({ ...ROMA }).find((f) => f.idExterno === "confirmada")!.id,
+      ROMA,
+    )!;
+    expect(ficha.confirmadaHaceDias).toBe(6);
+    expect(ficha.estado).toBe("en-servicio");
   });
 
   it("catálogo acotado a ciudad activa: Roma sí, ciudad inactiva no mezcla", () => {

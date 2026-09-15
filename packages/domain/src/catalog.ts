@@ -171,6 +171,16 @@ export class InMemoryFuenteCatalog {
 
   // ---- Descubrimiento (sin cuenta, ignora ocultas) ----
 
+  /**
+   * Ocultación blanda para fixtures/tests hasta T6b (quórum + proporción).
+   * No es el camino de producto; deja rastro vía `detalle`.
+   */
+  forzarOculta(id: string, oculta = true): void {
+    const f = this.fuentes.get(id);
+    if (!f) throw new Error("Fuente no encontrada.");
+    f.oculta = oculta;
+  }
+
   cercanas(args: CercanasArgs): FuentePublica[] {
     const ciudadId = args.ciudadId ?? "roma";
     const limite = args.limite ?? 50;
@@ -181,8 +191,25 @@ export class InMemoryFuenteCatalog {
       .slice(0, limite);
   }
 
+  /**
+   * Modo sed: fuente usable más cercana.
+   * Excluye ocultas (vía `cercanas`) y secas; a igualdad de distancia
+   * prioriza en-servicio y luego frescura (confirmada hace menos días).
+   */
   masCercana(args: CercanasArgs): FuentePublica | undefined {
-    return this.cercanas(args)[0];
+    return this.cercanas({ ...args, limite: Number.MAX_SAFE_INTEGER })
+      .filter((f) => f.estado !== "seca")
+      .sort((a, b) => {
+        const porDistancia = a.distanciaM - b.distanciaM;
+        if (Math.abs(porDistancia) > 0.5) return porDistancia;
+        const rango = (estado: FuentePublica["estado"]) =>
+          estado === "en-servicio" ? 0 : 1;
+        const porEstado = rango(a.estado) - rango(b.estado);
+        if (porEstado !== 0) return porEstado;
+        const fa = a.confirmadaHaceDias ?? Number.POSITIVE_INFINITY;
+        const fb = b.confirmadaHaceDias ?? Number.POSITIVE_INFINITY;
+        return fa - fb;
+      })[0];
   }
 
   detalle(id: string, desde?: { lat: number; lon: number }): FuentePublica | undefined {

@@ -6,12 +6,32 @@
     "orientation": "portrait",
     "platforms": ["ios", "android"],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Erasmusu usa tu ubicación para encontrar la fuente potable más cercana.",
+        "LSApplicationQueriesSchemes": [
+          "comgooglemaps",
+          "waze",
+          "maps",
+          "googlechromes",
+          "googlechrome"
+        ]
+      }
     },
     "android": {
-      "package": "com.erasmusu.app"
+      "package": "com.erasmusu.app",
+      "permissions": ["ACCESS_COARSE_LOCATION", "ACCESS_FINE_LOCATION"]
     },
-    "plugins": ["expo-asset", "expo-font"],
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Erasmusu usa tu ubicación para encontrar la fuente potable más cercana."
+        }
+      ]
+    ],
     "experiments": {
       "autolinkingModuleResolution": true
     }
