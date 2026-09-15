@@ -8,7 +8,8 @@ import {
   View,
   useWindowDimensions,
 } from "react-native";
-import MapView, { Marker, PROVIDER_DEFAULT } from "react-native-maps";
+import { Marker, Circle, PROVIDER_DEFAULT } from "react-native-maps";
+import ClusteredMapView from "react-native-map-clustering";
 import {
   HaversinePresenceGate,
   InMemoryFuenteCatalog,
@@ -19,6 +20,7 @@ import {
 } from "@erasmusu/domain";
 
 const ROMA = { lat: 41.9028, lon: 12.4964 };
+const NOMBRE_FUENTE = "Fuente";
 
 /**
  * T2: mapa + lista de fuentes potables OSM Roma, sin cuenta.
@@ -41,11 +43,21 @@ export default function App() {
     [catalog],
   );
 
-  const [seleccion, setSeleccion] = useState<FuentePublica | undefined>(
-    () => fuentes[0],
+  /** Solo el id: cambia el pinColor remonta Markers y “salta” la selección. */
+  const [seleccionId, setSeleccionId] = useState<string | undefined>(
+    () => fuentes[0]?.id,
   );
   const [vista, setVista] = useState<"mapa" | "lista">("mapa");
   const [sed, setSed] = useState<string | null>(null);
+
+  const seleccion = useMemo(
+    () => fuentes.find((f) => f.id === seleccionId),
+    [fuentes, seleccionId],
+  );
+
+  const seleccionar = (f: FuentePublica) => {
+    setSeleccionId(f.id);
+  };
 
   const tengoSed = () => {
     const f = catalog.masCercana({ ...ROMA, ciudadId: "roma" });
@@ -53,9 +65,9 @@ export default function App() {
       setSed("Sin fuentes potables en el catálogo.");
       return;
     }
-    setSeleccion(f);
+    seleccionar(f);
     setSed(
-      `Fuente más cercana: ${f.idExterno ?? f.id} a ${Math.round(f.distanciaM)} m`,
+      `${NOMBRE_FUENTE} más cercana a ${Math.round(f.distanciaM)} m`,
     );
   };
 
@@ -85,7 +97,7 @@ export default function App() {
       </View>
 
       {vista === "mapa" ? (
-        <MapView
+        <ClusteredMapView
           style={{ height: height * 0.48, width: "100%" }}
           provider={PROVIDER_DEFAULT}
           initialRegion={{
@@ -94,18 +106,40 @@ export default function App() {
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}
+          clusterColor="#0b6e4f"
+          clusterTextColor="#ffffff"
+          radius={48}
+          extent={512}
+          minPoints={3}
+          animationEnabled={false}
+          spiralEnabled={false}
         >
           {fuentes.map((f) => (
             <Marker
               key={f.id}
+              identifier={f.id}
               coordinate={{ latitude: f.lat, longitude: f.lon }}
-              title={f.idExterno ?? f.id}
+              title={NOMBRE_FUENTE}
               description={`${Math.round(f.distanciaM)} m`}
-              onPress={() => setSeleccion(f)}
-              pinColor={seleccion?.id === f.id ? "#0b6e4f" : "#c45c26"}
+              pinColor="#c45c26"
+              tracksViewChanges={false}
+              onPress={(e) => {
+                e.stopPropagation();
+                seleccionar(f);
+              }}
             />
           ))}
-        </MapView>
+          {seleccion ? (
+            <Circle
+              center={{ latitude: seleccion.lat, longitude: seleccion.lon }}
+              radius={35}
+              strokeColor="#0b6e4f"
+              fillColor="rgba(11, 110, 79, 0.28)"
+              strokeWidth={2}
+              zIndex={1}
+            />
+          ) : null}
+        </ClusteredMapView>
       ) : (
         <FlatList
           style={{ flex: 1 }}
@@ -116,13 +150,11 @@ export default function App() {
             <Pressable
               style={[
                 estilos.fila,
-                seleccion?.id === item.id && estilos.filaActiva,
+                seleccionId === item.id && estilos.filaActiva,
               ]}
-              onPress={() => setSeleccion(item)}
+              onPress={() => seleccionar(item)}
             >
-              <Text style={estilos.filaTitulo}>
-                {item.idExterno ?? item.id}
-              </Text>
+              <Text style={estilos.filaTitulo}>{NOMBRE_FUENTE}</Text>
               <Text style={estilos.filaMeta}>
                 {Math.round(item.distanciaM)} m · {item.lat.toFixed(5)},{" "}
                 {item.lon.toFixed(5)}
@@ -135,10 +167,8 @@ export default function App() {
       <View style={estilos.ficha}>
         {seleccion ? (
           <>
-            <Text style={estilos.fichaTitulo}>Seleccionada</Text>
+            <Text style={estilos.fichaTitulo}>{NOMBRE_FUENTE}</Text>
             <Text style={estilos.fichaCuerpo}>
-              {seleccion.idExterno ?? seleccion.id}
-              {"\n"}
               {Math.round(seleccion.distanciaM)} m desde el centro · estado{" "}
               {seleccion.estado}
             </Text>

@@ -22,6 +22,7 @@
     "expo-modules-core": "~57.0.18",
     "react": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-map-clustering": "^4.0.0",
     "react-native-maps": "1.27.2"
   },
   "devDependencies": {
